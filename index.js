@@ -50,10 +50,22 @@ function pollStatus(cb) {
 
 function exit() {
   if (interval) clearInterval(interval);
+  toggleLights(0, 0, 0, function(err) {
+    if (err) {
+      console.error('Error turning off LED lights during shutdown.');
+      console.error(err);
+    }
+    else {
+      unexportLights();
+    }
+    process.exit();
+  });
+}
+
+function unexportLights() {
   red.unexport();
   blue.unexport();
   green.unexport();
-  process.exit();
 }
 
 function stop(cb)    { toggleLights(1, 0, 0, cb); }
