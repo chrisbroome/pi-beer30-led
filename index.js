@@ -1,9 +1,11 @@
 var
   async = require('async'),
+  client = require('superagent'),
   Gpio = require('onoff').Gpio,
   red = new Gpio(4, 'out'),
   blue = new Gpio(17, 'out'),
-  green = new Gpio(22, 'out');
+  green = new Gpio(22, 'out'),
+  interval;
 
 (function start() {
 //  stop();
@@ -16,12 +18,38 @@ var
   toggleLights(1, 1, 1, function() {
     setTimeout(function() { 
       toggleLights(0, 0, 0, logError);
+      pollStatus(handleStatusResult);
+      interval = setInterval(function() {
+        pollStatus(handleStatusResult);
+      }, 30000);
     }, 1000);
   });
+
 }());
+
+function handleStatusResult(err, result) {
+  var statusType = result.statusType;
+  if (typeof statusType === 'string') {
+    var status = statusType.toLowerCase();
+    if (status === 'stop') return stop();
+    if (status === 'caution') return caution();
+    if (status === 'go') return go();
+  }
+}
+
+function pollStatus(cb) {
+  client
+    .get('https://beer30.sparcedge.com/status')
+    .set('Accept', 'application/json')
+    .end(function(err, res) {
+      return err ? cb(err) : cb(null, res.body);
+    });
+}
+
 
 
 function exit() {
+  if (interval) clearInterval(interval);
   red.unexport();
   blue.unexport();
   green.unexport();
