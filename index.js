@@ -5,16 +5,12 @@ var
   red = new Gpio(4, 'out'),
   blue = new Gpio(17, 'out'),
   green = new Gpio(22, 'out'),
-  interval;
+  interval,
+  lastStatus = null;
 
 (function start() {
-//  stop();
-//  var cautionTimeout = setTimeout(function() {
-//   caution();
-//    var goTimeout = setTimeout(function() {
-//      go();
-//    }, 1000);
-//  }, 1000);
+  console.log('Beer30 Status Indicators');
+  console.log('Get the last status by sending a SIGUSR2 to this this pid:', process.pid);
   toggleLights(1, 1, 1, function() {
     setTimeout(function() { 
       toggleLights(0, 0, 0, logError);
@@ -38,15 +34,16 @@ function handleStatusResult(err, result) {
 }
 
 function pollStatus(cb) {
-  client
-    .get('https://beer30.sparcedge.com/status')
-    .set('Accept', 'application/json')
-    .end(function(err, res) {
-      return err ? cb(err) : cb(null, res.body);
-    });
+  toggleLights(0, 0, 0, function(err) {
+    if (err) return cb(err);
+    client
+      .get('https://beer30.sparcedge.com/status')
+      .set('Accept', 'application/json')
+      .end(function(err, res) {
+        return err ? cb(err) : cb(null, lastStatus = res.body);
+      });
+  });
 }
-
-
 
 function exit() {
   if (interval) clearInterval(interval);
@@ -89,8 +86,17 @@ function redOff(cb){ red.write(0, cb); }
 function blueOff(cb){ blue.write(0, cb); }
 function greenOff(cb){ green.write(0, cb); }
 
-process.on('SIGINT', exit);
-
+process.stdin.on('end', function() {
+  console.log('End of input received. Exiting...');
+  exit();
+});
+process.on('SIGINT', function() {
+  console.log('SIGINT received. Press CTRL+D to exit');
+});
+process.on('SIGUSR2', function() {
+  console.log('SIGUSR2 received.');
+  console.dir(lastStatus);
+});
 /*
 {
   "description": "Alcoholic beverages are off limits.",
