@@ -11,19 +11,21 @@ var
 (function start() {
   console.log('Beer30 Status Indicators');
   console.log('Get the last status by sending a SIGUSR2 to this this pid:', process.pid);
-  toggleLights(1, 1, 1, function() {
+  allOn(function() {
     setTimeout(function() { 
-      toggleLights(0, 0, 0, logError);
-      pollStatus(handleStatusResult);
-      interval = setInterval(function() {
-        pollStatus(handleStatusResult);
-      }, 30000);
+      pollAndHandleResult();
+      interval = setInterval(pollAndHandleResult, 30000);
     }, 1000);
   });
 
 }());
 
+function pollAndHandleResult() {
+  pollStatus(handleStatusResult);
+}
+
 function handleStatusResult(err, result) {
+  if (err) return logError(err);
   var statusType = result.statusType;
   if (typeof statusType === 'string') {
     var status = statusType.toLowerCase();
@@ -34,23 +36,25 @@ function handleStatusResult(err, result) {
 }
 
 function pollStatus(cb) {
-  toggleLights(0, 0, 0, function(err) {
+  allOff(function(err) {
     if (err) return cb(err);
     client
       .get('https://beer30.sparcedge.com/status')
       .set('Accept', 'application/json')
       .end(function(err, res) {
-        return err ? cb(err) : cb(null, lastStatus = res.body);
+        if (err) return cb(err);
+        lastStatus = res.body;
+        cb(null, lastStatus);
       });
   });
 }
 
 function exit() {
   if (interval) clearInterval(interval);
-  toggleLights(0, 0, 0, function(err) {
+  allOff(function(err) {
     if (err) {
       console.error('Error turning off LED lights during shutdown.');
-      console.error(err);
+      logError(err);
     }
     else {
       unexportLights();
@@ -69,7 +73,6 @@ function stop(cb)    { toggleLights(1, 0, 0, cb); }
 function caution(cb) { toggleLights(0, 1, 0, cb); }
 function go(cb)      { toggleLights(0, 0, 1, cb); }
 
-function logError(err) { if (err) console.error(err); }
 function toggleLights(s, c, g, cb) {
   async.parallel([
     s ? redOn : redOff,
@@ -77,6 +80,9 @@ function toggleLights(s, c, g, cb) {
     g ? greenOn : greenOff
   ], cb);
 }
+
+function allOn(cb) { toggleLights(1, 1, 1, cb); }
+function allOff(cb) { toggleLights(0, 0, 0, cb); }
 
 function redOn(cb){ red.write(1, cb); }
 function blueOn(cb){ blue.write(1, cb); }
@@ -86,17 +92,20 @@ function redOff(cb){ red.write(0, cb); }
 function blueOff(cb){ blue.write(0, cb); }
 function greenOff(cb){ green.write(0, cb); }
 
-process.stdin.on('end', function() {
-  console.log('End of input received. Exiting...');
-  exit();
-});
 process.on('SIGINT', function() {
-  console.log('SIGINT received. Press CTRL+D to exit');
+  console.log('SIGINT received. Exiting...');
+  exit();
 });
 process.on('SIGUSR2', function() {
   console.log('SIGUSR2 received.');
   console.dir(lastStatus);
 });
+
+function logError(err) {
+  console.error(err);
+  console.error(err.stack);
+}
+
 /*
 {
   "description": "Alcoholic beverages are off limits.",
