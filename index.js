@@ -2,6 +2,7 @@ var
   async = require('async'),
   client = require('superagent'),
   Gpio = require('onoff').Gpio,
+  StatusResponse = require('./status-response'),
   red = new Gpio(4, 'out'),
   blue = new Gpio(17, 'out'),
   green = new Gpio(22, 'out'),
@@ -43,7 +44,7 @@ function pollStatus(cb) {
       .set('Accept', 'application/json')
       .end(function(err, res) {
         if (err) return cb(err);
-        lastStatus = res.body;
+        lastStatus = new StatusResponse(res.body);
         cb(null, lastStatus);
       });
   });
